@@ -1,0 +1,58 @@
+name: Manter Projeto Supabase Ativo!
+
+on:
+  schedule:
+    # Roda toda segunda-feira às 3:00 da manhã.
+    # Você pode ajustar o cron para o dia e hora que preferir.
+    - cron: '0 3 * * 1'
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Instalar a biblioteca do Supabase
+        run: npm install @supabase/supabase-js
+
+      - name: Executar consulta para manter o projeto ativo
+        run: |
+          node -e "
+            const { createClient } = require('@supabase/supabase-js');
+            const supabaseUrl = process.env.SUPABASE_URL;
+            const supabaseKey = process.env.SUPABASE_KEY;
+
+            if (!supabaseUrl || !supabaseKey) {
+              console.error('As secrets do Supabase não foram configuradas.');
+              process.exit(1);
+            }
+
+            const supabase = createClient(supabaseUrl, supabaseKey);
+
+            async function pingDatabase() {
+              try {
+                // Faz uma consulta leve que conta as linhas da tabela.
+                // Isso é suficiente para registrar como atividade.
+                const { error, count } = await supabase
+                  .from('satisfaction_forms')
+                  .select('id', { count: 'exact', head: true });
+
+                if (error) {
+                  throw error;
+                }
+                
+                console.log('Ping no Supabase realizado com sucesso. Total de respostas:', count);
+              } catch (error) {
+                console.error('Falha ao fazer ping no Supabase:', error.message);
+                process.exit(1);
+              }
+            }
+
+            pingDatabase();
+          "
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

@@ -2,17 +2,18 @@ name: Manter Projeto Supabase Ativo
 
 on:
   schedule:
-    - cron: '0 8 * * *' # Roda TODO DIA às 08:00 UTC
+    # MUDANÇA 1: Cron diário (08:00 UTC) para garantir atividade a cada 24h
+    - cron: '0 8 * * *'
   workflow_dispatch:
 
 jobs:
   ping-db:
     runs-on: ubuntu-latest
     steps:
-      - name: Configurar Node.js
+      - name: Configurar Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # ATUALIZADO: Usando Node v22
 
       - name: Instalar dependência
         run: npm install @supabase/supabase-js
@@ -20,7 +21,6 @@ jobs:
       - name: Executar Ping
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          # RECOMENDADO: Use a Service Role Key para garantir acesso
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }} 
         run: |
           node --input-type=module -e "
@@ -30,28 +30,28 @@ jobs:
             const key = process.env.SUPABASE_KEY;
 
             if (!url || !key) {
-              console.error('❌ Faltam variáveis de ambiente.');
+              console.error('❌ Erro: Secrets SUPABASE_URL ou SUPABASE_KEY não encontradas.');
               process.exit(1);
             }
 
             const supabase = createClient(url, key);
 
             async function ping() {
-              console.log('📡 Iniciando ping no Supabase...');
+              console.log('📡 Iniciando ping diário no Supabase...');
               
-              // REMOVIDO: head: true
-              // ADICIONADO: limit(1) para forçar leitura de dados
+              // MUDANÇA 2: Select real de 1 linha.
+              // 'head: true' muitas vezes não conta como atividade de banco.
               const { data, error } = await supabase
                 .from('satisfaction_forms')
                 .select('id')
                 .limit(1);
 
               if (error) {
-                console.error('❌ Erro no Supabase:', error.message);
+                console.error('❌ Erro de conexão:', error.message);
                 process.exit(1);
               }
 
-              console.log('✅ Sucesso! Dados recebidos:', data);
+              console.log('✅ Sucesso! O banco respondeu e a inatividade foi resetada.');
             }
 
             ping();

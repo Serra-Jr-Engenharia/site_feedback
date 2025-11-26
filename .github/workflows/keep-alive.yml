@@ -1,57 +1,58 @@
-name: Manter Projeto Supabase Ativo!
+name: Manter Projeto Supabase Ativo
 
 on:
   schedule:
-    - cron: '0 9 * * 1,4'
-
-  # (Opcional) Permite rodar manualmente pelo GitHub Actions UI.
+    - cron: '0 8 * * *' # Roda TODO DIA às 08:00 UTC
   workflow_dispatch:
 
 jobs:
-  keep-alive:
+  ping-db:
     runs-on: ubuntu-latest
-
     steps:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Instalar dependência do Supabase
+      - name: Instalar dependência
         run: npm install @supabase/supabase-js
 
-      - name: Executar consulta para manter o projeto ativo
+      - name: Executar Ping
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          # RECOMENDADO: Use a Service Role Key para garantir acesso
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }} 
         run: |
           node --input-type=module -e "
             import { createClient } from '@supabase/supabase-js';
 
-            const supabaseUrl = process.env.SUPABASE_URL;
-            const supabaseKey = process.env.SUPABASE_KEY;
+            const url = process.env.SUPABASE_URL;
+            const key = process.env.SUPABASE_KEY;
 
-            if (!supabaseUrl || !supabaseKey) {
-              console.error('❌ As secrets do Supabase não foram configuradas.');
+            if (!url || !key) {
+              console.error('❌ Faltam variáveis de ambiente.');
               process.exit(1);
             }
 
-            const supabase = createClient(supabaseUrl, supabaseKey);
+            const supabase = createClient(url, key);
 
-            const pingDatabase = async () => {
-              try {
-                const { error, count } = await supabase
-                  .from('satisfaction_forms')
-                  .select('id', { count: 'exact', head: true });
+            async function ping() {
+              console.log('📡 Iniciando ping no Supabase...');
+              
+              // REMOVIDO: head: true
+              // ADICIONADO: limit(1) para forçar leitura de dados
+              const { data, error } = await supabase
+                .from('satisfaction_forms')
+                .select('id')
+                .limit(1);
 
-                if (error) throw error;
-
-                console.log('✅ Ping no Supabase realizado com sucesso! Total de respostas:', count);
-              } catch (error) {
-                console.error('❌ Falha ao fazer ping no Supabase:', error.message);
+              if (error) {
+                console.error('❌ Erro no Supabase:', error.message);
                 process.exit(1);
               }
-            };
 
-            pingDatabase();
+              console.log('✅ Sucesso! Dados recebidos:', data);
+            }
+
+            ping();
           "
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
